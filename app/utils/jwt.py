@@ -49,7 +49,7 @@
 
 # new
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from app.config import get_settings
 
@@ -63,10 +63,16 @@ def create_access_token(user_id: str, email: str) -> str:
     payload = {
         "sub": user_id,
         "email": email,
-        "exp": datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc)
+        + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
     }
-    return jwt.encode(payload, settings.better_auth_secret, algorithm=ALGORITHM)
+
+    return jwt.encode(
+        payload,
+        settings.better_auth_secret,
+        algorithm=ALGORITHM,
+    )
 
 
 def decode_access_token(token: str) -> Optional[dict]:
@@ -80,3 +86,4 @@ def decode_access_token(token: str) -> Optional[dict]:
         return None
     except jwt.InvalidTokenError:
         return None
+

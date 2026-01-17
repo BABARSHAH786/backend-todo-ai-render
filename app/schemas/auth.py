@@ -19,8 +19,8 @@ class AuthResponse(BaseModel):
 
 
 class SessionResponse(BaseModel):
-    authenticated: bool
-    user: Optional[UserResponse] = None
+    user: UserResponse
+
 
 
 

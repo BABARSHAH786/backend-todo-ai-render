@@ -195,7 +195,6 @@ async def signup(
     data: AuthRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    # Check if email already exists
     statement = select(User).where(User.email == data.email)
     result = await session.execute(statement)
     existing_user = result.scalar_one_or_none()
@@ -206,13 +205,10 @@ async def signup(
             detail="Email already registered",
         )
 
-    user_id = str(uuid.uuid4())
-    hashed_password = hash_password(data.password)
-
     user = User(
-        id=user_id,
+        id=str(uuid.uuid4()),
         email=data.email,
-        password_hash=hashed_password,
+        password_hash=hash_password(data.password),
     )
 
     session.add(user)
@@ -243,7 +239,14 @@ async def signin(
     result = await session.execute(statement)
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(data.password, user.password_hash):
+    # 🔒 Prevents 500 crashes
+    if not user or not user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -269,20 +272,20 @@ async def get_session_route(
     authorization: str = Header(None),
     session: AsyncSession = Depends(get_session),
 ):
-    if not authorization:
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing",
-        )
-
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization format",
+            detail="Invalid or missing Authorization header",
         )
 
     token = authorization.replace("Bearer ", "")
     payload = decode_access_token(token)
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
 
     user_id = payload.get("sub")
     if not user_id:
@@ -311,12 +314,8 @@ async def get_session_route(
 
 
 # =========================
-# SIGN OUT (CLIENT SIDE)
+# SIGN OUT
 # =========================
 @router.post("/signout")
 async def signout():
-    """
-    JWT-based logout is handled on the client
-    by removing the token from storage.
-    """
     return {"message": "Signed out successfully"}
