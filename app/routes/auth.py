@@ -168,29 +168,34 @@
 
 
 # new
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 import uuid
 
 from app.database import get_session
 from app.models import User
-from app.schemas import AuthRequest, AuthResponse, UserResponse
-from app.utils.jwt import create_access_token
+from app.schemas import (
+    AuthRequest,
+    AuthResponse,
+    UserResponse,
+    SessionResponse,
+)
+from app.utils.jwt import create_access_token, decode_access_token
 from app.utils.password import hash_password, verify_password
-from app.middleware.auth import get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
+# =========================
+# SIGN UP
+# =========================
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(
     data: AuthRequest,
-    response: Response,
     session: AsyncSession = Depends(get_session),
 ):
-    print(f"DEBUG: Signup attempt for {data.email}")
-
+    # Check if email already exists
     statement = select(User).where(User.email == data.email)
     result = await session.execute(statement)
     existing_user = result.scalar_one_or_none()
@@ -201,10 +206,13 @@ async def signup(
             detail="Email already registered",
         )
 
+    user_id = str(uuid.uuid4())
+    hashed_password = hash_password(data.password)
+
     user = User(
-        id=str(uuid.uuid4()),
+        id=user_id,
         email=data.email,
-        password_hash=hash_password(data.password),
+        password_hash=hashed_password,
     )
 
     session.add(user)
@@ -213,50 +221,29 @@ async def signup(
 
     token = create_access_token(user.id, user.email)
 
-    response.set_cookie(
-        key="auth_token",
-        value=token,
-        httponly=True,
-        secure=True,        # REQUIRED on Render
-        samesite="none",    # REQUIRED for Next.js cross-site
-        max_age=60 * 60 * 24 * 7,
-    )
-
     return AuthResponse(
         user=UserResponse(
             id=user.id,
             email=user.email,
             name=user.name,
-        )
+        ),
+        token=token,
     )
 
 
+# =========================
+# SIGN IN
+# =========================
 @router.post("/signin", response_model=AuthResponse)
 async def signin(
     data: AuthRequest,
-    response: Response,
     session: AsyncSession = Depends(get_session),
 ):
-    print(f"DEBUG: Signin attempt for {data.email}")
-
     statement = select(User).where(User.email == data.email)
     result = await session.execute(statement)
     user = result.scalar_one_or_none()
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
-
-    # 🔒 CRITICAL FIX — prevents 500
-    if not user.password_hash:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
-
-    if not verify_password(data.password, user.password_hash):
+    if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -264,43 +251,45 @@ async def signin(
 
     token = create_access_token(user.id, user.email)
 
-    response.set_cookie(
-        key="auth_token",
-        value=token,
-        httponly=True,
-        secure=True,        # REQUIRED on Render
-        samesite="none",    # REQUIRED for Next.js cross-site
-        max_age=60 * 60 * 24 * 7,
-    )
-
     return AuthResponse(
         user=UserResponse(
             id=user.id,
             email=user.email,
             name=user.name,
-        )
+        ),
+        token=token,
     )
 
 
-@router.post("/signout")
-async def signout(
-    response: Response,
-    current_user: dict = Depends(get_current_user),
-):
-    response.delete_cookie(
-        key="auth_token",
-        secure=True,
-        samesite="none",
-    )
-    return {"message": "Signed out successfully"}
-
-
-@router.get("/session", response_model=AuthResponse)
+# =========================
+# SESSION (JWT HEADER)
+# =========================
+@router.get("/session", response_model=SessionResponse)
 async def get_session_route(
+    authorization: str = Header(None),
     session: AsyncSession = Depends(get_session),
-    current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user.get("sub")
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing",
+        )
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization format",
+        )
+
+    token = authorization.replace("Bearer ", "")
+    payload = decode_access_token(token)
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
 
     statement = select(User).where(User.id == user_id)
     result = await session.execute(statement)
@@ -312,10 +301,22 @@ async def get_session_route(
             detail="User not found",
         )
 
-    return AuthResponse(
+    return SessionResponse(
         user=UserResponse(
             id=user.id,
             email=user.email,
             name=user.name,
         )
     )
+
+
+# =========================
+# SIGN OUT (CLIENT SIDE)
+# =========================
+@router.post("/signout")
+async def signout():
+    """
+    JWT-based logout is handled on the client
+    by removing the token from storage.
+    """
+    return {"message": "Signed out successfully"}
