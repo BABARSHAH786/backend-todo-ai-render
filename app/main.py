@@ -47,7 +47,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": str(exc)},
         headers={
-            "Access-Control-Allow-Origin": request.headers.get("Origin", "http://localhost:3000"),
+            "Access-Control-Allow-Origin": request.headers.get("Origin","https://todoagent.techkl.de", "http://localhost:3000"),
             "Access-Control-Allow-Credentials": "true",
         }
     )
