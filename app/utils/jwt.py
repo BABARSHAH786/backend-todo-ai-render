@@ -1,57 +1,9 @@
-# import jwt
-# from datetime import datetime, timedelta
-# from typing import Optional
-
-# from app.config import get_settings
-
-
-# settings = get_settings()
-
-# ALGORITHM = "HS256"
-# ACCESS_TOKEN_EXPIRE_DAYS = 7
-
-
-# def create_access_token(user_id: str, email: str) -> str:
-#     """Create a JWT access token."""
-#     expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-#     payload = {
-#         "sub": user_id,
-#         "email": email,
-#         "exp": expire,
-#         "iat": datetime.utcnow(),
-#     }
-#     return jwt.encode(payload, settings.better_auth_secret, algorithm=ALGORITHM)
-
-
-# def verify_token(token: str) -> Optional[dict]:
-#     """Verify and decode a JWT token."""
-#     try:
-#         payload = jwt.decode(
-#             token, settings.better_auth_secret, algorithms=[ALGORITHM]
-#         )
-#         return payload
-#     except jwt.ExpiredSignatureError:
-#         return None
-#     except jwt.InvalidTokenError:
-#         return None
-
-
-# def get_user_id_from_token(token: str) -> Optional[str]:
-#     """Extract user_id from a JWT token."""
-#     payload = verify_token(token)
-#     if payload:
-#         return payload.get("sub")
-#     return None
-
-
-
-
-
-# new
 import jwt
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
+
 from app.config import get_settings
+
 
 settings = get_settings()
 
@@ -60,30 +12,78 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 
 def create_access_token(user_id: str, email: str) -> str:
+    """Create a JWT access token."""
+    expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": user_id,
         "email": email,
-        "iat": datetime.now(timezone.utc),
-        "exp": datetime.now(timezone.utc)
-        + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
+        "exp": expire,
+        "iat": datetime.utcnow(),
     }
-
-    return jwt.encode(
-        payload,
-        settings.better_auth_secret,
-        algorithm=ALGORITHM,
-    )
+    return jwt.encode(payload, settings.better_auth_secret, algorithm=ALGORITHM)
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+def verify_token(token: str) -> Optional[dict]:
+    """Verify and decode a JWT token."""
     try:
-        return jwt.decode(
-            token,
-            settings.better_auth_secret,
-            algorithms=[ALGORITHM],
+        payload = jwt.decode(
+            token, settings.better_auth_secret, algorithms=[ALGORITHM]
         )
+        return payload
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
         return None
+
+
+def get_user_id_from_token(token: str) -> Optional[str]:
+    """Extract user_id from a JWT token."""
+    payload = verify_token(token)
+    if payload:
+        return payload.get("sub")
+    return None
+
+
+
+
+
+# new
+# import jwt
+# from datetime import datetime, timedelta, timezone
+# from typing import Optional
+# from app.config import get_settings
+
+# settings = get_settings()
+
+# ALGORITHM = "HS256"
+# ACCESS_TOKEN_EXPIRE_DAYS = 7
+
+
+# def create_access_token(user_id: str, email: str) -> str:
+#     payload = {
+#         "sub": user_id,
+#         "email": email,
+#         "iat": datetime.now(timezone.utc),
+#         "exp": datetime.now(timezone.utc)
+#         + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
+#     }
+
+#     return jwt.encode(
+#         payload,
+#         settings.better_auth_secret,
+#         algorithm=ALGORITHM,
+#     )
+
+
+# def decode_access_token(token: str) -> Optional[dict]:
+#     try:
+#         return jwt.decode(
+#             token,
+#             settings.better_auth_secret,
+#             algorithms=[ALGORITHM],
+#         )
+#     except jwt.ExpiredSignatureError:
+#         return None
+#     except jwt.InvalidTokenError:
+#         return None
 
