@@ -186,27 +186,20 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 # Detect environment: production vs local
 IS_PROD = os.getenv("DEPLOYMENT_ENV") == "production"
 
-
-# =========================
+# ------------------------
 # SIGN UP
-# =========================
+# ------------------------
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(
     data: AuthRequest,
     response: Response,
     session: AsyncSession = Depends(get_session),
 ):
-    print(f"DEBUG: Signup attempt for {data.email}")
-
     statement = select(User).where(User.email == data.email)
     result = await session.execute(statement)
     existing_user = result.scalar_one_or_none()
-
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
+        raise HTTPException(status_code=409, detail="Email already registered")
 
     user = User(
         id=str(uuid.uuid4()),
@@ -220,12 +213,11 @@ async def signup(
 
     token = create_access_token(user.id, user.email)
 
-    # Set cookie with cross-domain support
     response.set_cookie(
         key="auth_token",
         value=token,
         httponly=True,
-        secure=IS_PROD,  # HTTPS in production
+        secure=IS_PROD,
         samesite="none" if IS_PROD else "lax",
         max_age=60 * 60 * 24 * 7,
     )
@@ -235,36 +227,29 @@ async def signup(
         token=token,
     )
 
-
-# =========================
+# ------------------------
 # SIGN IN
-# =========================
+# ------------------------
 @router.post("/signin", response_model=AuthResponse)
 async def signin(
     data: AuthRequest,
     response: Response,
     session: AsyncSession = Depends(get_session),
 ):
-    print(f"DEBUG: Signin attempt for {data.email}")
-
     statement = select(User).where(User.email == data.email)
     result = await session.execute(statement)
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token(user.id, user.email)
 
-    # Set cookie with cross-domain support
     response.set_cookie(
         key="auth_token",
         value=token,
         httponly=True,
-        secure=IS_PROD,  # HTTPS in production
+        secure=IS_PROD,
         samesite="none" if IS_PROD else "lax",
         max_age=60 * 60 * 24 * 7,
     )
@@ -274,10 +259,9 @@ async def signin(
         token=token,
     )
 
-
-# =========================
+# ------------------------
 # SIGN OUT
-# =========================
+# ------------------------
 @router.post("/signout")
 async def signout(
     response: Response,
@@ -286,31 +270,25 @@ async def signout(
     response.delete_cookie(key="auth_token")
     return {"message": "Signed out successfully"}
 
-
-# =========================
+# ------------------------
 # SESSION
-# =========================
+# ------------------------
 @router.get("/session", response_model=AuthResponse)
 async def get_session_route(
     session: AsyncSession = Depends(get_session),
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user.get("sub")
-
     statement = select(User).where(User.id == user_id)
     result = await session.execute(statement)
     user = result.scalar_one_or_none()
-
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
+        raise HTTPException(status_code=401, detail="User not found")
 
-    # Token not needed in session, but schema requires it
+    # Return a token for frontend if needed (can be empty string)
     return AuthResponse(
         user=UserResponse(id=user.id, email=user.email, name=user.name),
-        token="",  
+        token="",  # optional
     )
 
 
