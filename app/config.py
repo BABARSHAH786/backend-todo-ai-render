@@ -7,8 +7,11 @@ class Settings(BaseSettings):
 
     database_url: str
     better_auth_secret: str
-    frontend_url: str = "https://todoagent.techkl.de"
-    cors_origins: str = "https://todoagent.techkl.de"
+    # frontend_url: str = "https://todoagent.techkl.de"
+    # frontend_url: str = "https://todoagent.techkl.de"  #comment due to check
+    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000"
+
 
     # Gemini Configuration
     gemini_api_key: str | None = None
