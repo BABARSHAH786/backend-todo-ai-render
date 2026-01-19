@@ -172,6 +172,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 import uuid
+import os
 
 from app.database import get_session
 from app.models import User
@@ -181,6 +182,9 @@ from app.utils.password import hash_password, verify_password
 from app.middleware.auth import get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+# Detect environment: production vs local
+IS_PROD = os.getenv("DEPLOYMENT_ENV") == "production"
 
 
 # =========================
@@ -216,12 +220,13 @@ async def signup(
 
     token = create_access_token(user.id, user.email)
 
+    # Set cookie with cross-domain support
     response.set_cookie(
         key="auth_token",
         value=token,
         httponly=True,
-        secure=False,  # True in production
-        samesite="lax",
+        secure=IS_PROD,  # HTTPS in production
+        samesite="none" if IS_PROD else "lax",
         max_age=60 * 60 * 24 * 7,
     )
 
@@ -246,13 +251,7 @@ async def signin(
     result = await session.execute(statement)
     user = result.scalar_one_or_none()
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
-
-    if not verify_password(data.password, user.password_hash):
+    if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -260,12 +259,13 @@ async def signin(
 
     token = create_access_token(user.id, user.email)
 
+    # Set cookie with cross-domain support
     response.set_cookie(
         key="auth_token",
         value=token,
         httponly=True,
-        secure=False,  # True in production
-        samesite="lax",
+        secure=IS_PROD,  # HTTPS in production
+        samesite="none" if IS_PROD else "lax",
         max_age=60 * 60 * 24 * 7,
     )
 
@@ -307,9 +307,10 @@ async def get_session_route(
             detail="User not found",
         )
 
+    # Token not needed in session, but schema requires it
     return AuthResponse(
         user=UserResponse(id=user.id, email=user.email, name=user.name),
-        token="",  # token not needed here but required by schema
+        token="",  
     )
 
 
