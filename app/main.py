@@ -29,7 +29,7 @@ app = FastAPI(
 # Configure CORS - allow all origins for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["https://aitodo.techkl.de"],
     # allow_origins=["https://todoagent.techkl.de"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -48,7 +48,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": str(exc)},
         headers={
-            "Access-Control-Allow-Origin": request.headers.get("Origin","http://localhost:3000"),
+            "Access-Control-Allow-Origin": request.headers.get("Origin","https://aitodo.techkl.de"),
             "Access-Control-Allow-Credentials": "true",
         }
     )
