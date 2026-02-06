@@ -184,7 +184,8 @@ from app.middleware.auth import get_current_user
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 # Detect environment: production vs local
-IS_PROD = os.getenv("DEPLOYMENT_ENV") == "production"
+# IS_PROD = os.getenv("DEPLOYMENT_ENV") == "production"
+IS_PROD = True
 
 # ------------------------
 # SIGN UP
@@ -213,14 +214,18 @@ async def signup(
 
     token = create_access_token(user.id, user.email)
 
+
+    
     response.set_cookie(
-        key="auth_token",
-        value=token,
-        httponly=True,
-        secure=IS_PROD,
-        samesite="none" if IS_PROD else "lax",
-        max_age=60 * 60 * 24 * 7,
-    )
+    key="auth_token",
+    value=token,
+    httponly=True,
+    secure=True,
+    samesite="none",
+    max_age=60 * 60 * 24 * 7,
+    path="/",
+)
+
 
     return AuthResponse(
         user=UserResponse(id=user.id, email=user.email, name=user.name),

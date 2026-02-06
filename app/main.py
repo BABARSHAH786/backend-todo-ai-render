@@ -38,11 +38,15 @@ app.add_middleware(
 )
 
 # Global exception handler to ensure CORS headers are always sent
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Catch all unhandled exceptions and return proper CORS headers."""
-    print(f"Unhandled exception: {exc}")
-    print(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
+
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
